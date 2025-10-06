@@ -1,5 +1,24 @@
 # em-co2-api
 
+## 1.3.0
+
+### Minor Changes
+
+- 20e6ac2: new pr creation cycle
+
+### Patch Changes
+
+- 3e23b3c: fixed pnpm version
+- 8affefb: fixed second pnpm version
+- f8d58b1: test
+- 64fc7a2: nex try
+- 4def6f2: what should i say
+- 051f531: ja ja
+- 483ab1b: go go
+- 3e46c18: next test
+- ac70196: test 3
+- e228264: next go 2
+
 ## 1.2.3
 
 ### Patch Changes
