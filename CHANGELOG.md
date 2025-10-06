@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.4.1
+
+### Patch Changes
+
+- 36e7c59: next try
+
 ## 1.4.0
 
 ### Minor Changes
