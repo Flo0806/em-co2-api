@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.changeset.outputs.version }}
-      # Wir fügen einen zweiten Output hinzu, um zu signalisieren, ob ein PR erstellt werden soll
+      # We add a second output to signal whether a PR should be created
       should_run: ${{ steps.changeset.outputs.should_run }}
     steps:
       - name: Checkout repository
@@ -35,10 +35,10 @@ jobs:
       - name: Get next version number
         id: changeset
         run: |
-          # Hole den JSON-Output
+          # Get the JSON output
           CHANGESET_STATUS=$(pnpm changeset status --json)
 
-          # Prüfe, ob das 'releases' Array leer ist
+          # Check if the 'releases' array is empty
           if [ "$(echo "$CHANGESET_STATUS" | jq '.releases | length')" -eq 0 ]; then
             echo "No changesets found. Exiting gracefully."
             echo "should_run=false" >> $GITHUB_OUTPUT
@@ -52,7 +52,7 @@ jobs:
   create-pr:
     name: Create Version PR
     needs: get-version
-    # FÜHRE DIESEN JOB NUR AUS, WENN 'should_run' true ist
+    # ONLY RUN THIS JOB IF 'should_run' is true
     if: needs.get-version.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     permissions:
