@@ -8,12 +8,17 @@ on:
     paths:
       - ".changeset/**"
 
+concurrency:
+  group: version-pr-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   get-version:
     name: Get next version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.changeset.outputs.version }}
+      should_run: ${{ steps.changeset.outputs.should_run }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,29 +30,78 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Get next version number
+      - name: Get next version number (via Changesets API)
         id: changeset
+        shell: bash
         run: |
-          # Führe 'snapshot' aus, um die package.json temporär zu aktualisieren
-          pnpm changeset version --snapshot
+          node <<'NODE'
+          const fs = require('fs');
 
-          # Lese die neue Version direkt aus der nun geänderten package.json
-          VERSION=$(jq -r .version package.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          // Safe write to GitHub outputs
+          const out = process.env.GITHUB_OUTPUT;
+          const setOutput = (k, v) => fs.appendFileSync(out, `${k}=${v}\n`);
 
-          # Setze alle Dateiänderungen zurück, damit der nächste Job sauber startet
-          git restore .
+          async function main() {
+            let getReleasePlan;
+            try {
+              // Changesets’ official API
+              getReleasePlan = require("@changesets/get-release-plan").default;
+            } catch (e) {
+              // Falls Changesets (unerwartet) nicht installiert ist
+              setOutput('should_run', 'false');
+              return;
+            }
+
+            let plan;
+            try {
+              plan = await getReleasePlan(process.cwd());
+            } catch (e) {
+              setOutput('should_run', 'false');
+              return;
+            }
+
+            const releases = Array.isArray(plan?.releases) ? plan.releases : [];
+            if (releases.length === 0) {
+              setOutput('should_run', 'false');
+              return;
+            }
+
+            // Version bestimmen:
+            // - Single-Package: releases[0].newVersion
+            // - Monorepo/independent: nimm die HÖCHSTE Semver (für PR-Titel)
+            let version = releases[0]?.newVersion;
+            try {
+              const semver = require('semver');
+              version = releases
+                .map(r => r.newVersion)
+                .filter(Boolean)
+                .sort((a, b) => (semver.gt(a, b) ? -1 : 1))  // absteigend
+                [0] || version;
+            } catch {
+              // semver nicht vorhanden -> first fallback
+            }
+
+            if (!version) {
+              setOutput('should_run', 'false');
+              return;
+            }
+
+            setOutput('version', version);
+            setOutput('should_run', 'true');
+          }
+
+          main();
+          NODE
 
   create-pr:
-    name: Create Version PR
+    name: Create/Update Version PR
     needs: get-version
-    # Starte nur, wenn eine Version gefunden wurde
-    if: needs.get-version.outputs.version != ''
+    if: needs.get-version.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -65,12 +119,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create Changeset PR or update existing one
+      # Wichtig:
+      # - "version" triggert das Erstellen/Updaten des Release-PRs.
+      # - Der PR wird automatisch wiederverwendet/aktualisiert, wenn weitere Changesets dazukommen.
+      - name: Create or update Changeset PR
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
