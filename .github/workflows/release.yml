@@ -68,8 +68,11 @@ jobs:
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "repo=$REPO_LOWER" >> $GITHUB_OUTPUT
           echo "📦 Releasing version: $VERSION"
+          echo "📦 Repository: $REPO_LOWER"
 
       - name: Build and push Docker image
         if: steps.check_changesets.outputs.has_changesets == 'false'
@@ -78,8 +81,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ steps.version.outputs.repo }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ steps.version.outputs.repo }}:latest
           labels: |
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
             org.opencontainers.image.source=${{ github.repositoryUrl }}
