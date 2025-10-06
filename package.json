@@ -11,6 +11,9 @@
     "start": "node --env-file=.env dist/server.js",
     "build": "tsc -p ."
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "dotenv": "^17.2.1",
     "fastify": "^5.5.0",
