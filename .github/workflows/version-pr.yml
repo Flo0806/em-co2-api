@@ -14,8 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.changeset.outputs.version }}
-      # We add a second output to signal whether a PR should be created
-      should_run: ${{ steps.changeset.outputs.should_run }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,25 +33,21 @@ jobs:
       - name: Get next version number
         id: changeset
         run: |
-          # Get the JSON output
-          CHANGESET_STATUS=$(pnpm changeset status --json)
+          # Führe 'snapshot' aus, um die package.json temporär zu aktualisieren
+          pnpm changeset version --snapshot
 
-          # Check if the 'releases' array is empty
-          if [ "$(echo "$CHANGESET_STATUS" | jq '.releases | length')" -eq 0 ]; then
-            echo "No changesets found. Exiting gracefully."
-            echo "should_run=false" >> $GITHUB_OUTPUT
-          else
-            echo "Changesets found. Proceeding to create PR."
-            VERSION=$(echo "$CHANGESET_STATUS" | jq -r '.releases[0].newVersion')
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
-            echo "should_run=true" >> $GITHUB_OUTPUT
-          fi
+          # Lese die neue Version direkt aus der nun geänderten package.json
+          VERSION=$(jq -r .version package.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Setze alle Dateiänderungen zurück, damit der nächste Job sauber startet
+          git restore .
 
   create-pr:
     name: Create Version PR
     needs: get-version
-    # ONLY RUN THIS JOB IF 'should_run' is true
-    if: needs.get-version.outputs.should_run == 'true'
+    # Starte nur, wenn eine Version gefunden wurde
+    if: needs.get-version.outputs.version != ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
