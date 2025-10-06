@@ -1,0 +1,45 @@
+# .github/workflows/release.yml
+
+name: Create GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    # Die 'if'-Bedingung stellt sicher, dass der Job nur nach dem Mergen des Versions-PRs läuft
+    if: contains(github.event.head_commit.message, 'Upcoming Release')
+    permissions:
+      contents: write # Nötig, um Git-Tags zu pushen und Releases zu erstellen
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Wir brauchen den kompletten Verlauf für die Tags
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Git Tags and GitHub Releases
+        uses: changesets/action@v1
+        with:
+          publish: pnpm changeset tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
