@@ -1,5 +1,16 @@
 # em-co2-api
 
+## 1.4.0
+
+### Minor Changes
+
+- bb4e068: breaking
+
+### Patch Changes
+
+- 9eeff55: jaja
+- 5d0463e: test first pr
+
 ## 1.3.0
 
 ### Minor Changes
