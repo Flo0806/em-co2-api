@@ -14,11 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.changeset.outputs.version }}
+      # Wir fügen einen zweiten Output hinzu, um zu signalisieren, ob ein PR erstellt werden soll
+      should_run: ${{ steps.changeset.outputs.should_run }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Dieser Schritt funktioniert jetzt, weil 'packageManager' in der package.json steht
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
 
@@ -34,12 +35,25 @@ jobs:
       - name: Get next version number
         id: changeset
         run: |
-          VERSION=$(pnpm changeset status --json | jq -r '.releases[0].newVersion')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Hole den JSON-Output
+          CHANGESET_STATUS=$(pnpm changeset status --json)
+
+          # Prüfe, ob das 'releases' Array leer ist
+          if [ "$(echo "$CHANGESET_STATUS" | jq '.releases | length')" -eq 0 ]; then
+            echo "No changesets found. Exiting gracefully."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changesets found. Proceeding to create PR."
+            VERSION=$(echo "$CHANGESET_STATUS" | jq -r '.releases[0].newVersion')
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
 
   create-pr:
     name: Create Version PR
     needs: get-version
+    # FÜHRE DIESEN JOB NUR AUS, WENN 'should_run' true ist
+    if: needs.get-version.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -50,7 +64,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Auch hier ohne 'with:'
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
 
