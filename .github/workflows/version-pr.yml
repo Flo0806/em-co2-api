@@ -8,90 +8,9 @@ on:
     paths:
       - ".changeset/**"
 
-# Verhindert parallele Version-PRs auf derselben Branch
-concurrency:
-  group: version-pr-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  get-version:
-    name: Get next version
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.changeset.outputs.version }}
-      should_run: ${{ steps.changeset.outputs.should_run }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Get next version number (via Changesets API)
-        id: changeset
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-          const out = process.env.GITHUB_OUTPUT;
-          const set = (k, v) => fs.appendFileSync(out, `${k}=${v}\n`);
-
-          (async () => {
-            try {
-              const getReleasePlan = require("@changesets/get-release-plan").default;
-              const plan = await getReleasePlan(process.cwd());
-              const releases = Array.isArray(plan?.releases) ? plan.releases : [];
-
-              if (releases.length === 0) {
-                set('should_run', 'false');
-                return;
-              }
-
-              // Version für PR-Titel bestimmen:
-              // - Single-Package: releases[0].newVersion
-              // - Monorepo: höchste Zielversion (semver-max)
-              let version = releases[0]?.newVersion;
-              try {
-                const semver = require('semver');
-                version = releases
-                  .map(r => r.newVersion)
-                  .filter(Boolean)
-                  .sort((a, b) => (semver.gt(a, b) ? -1 : 1))[0] || version;
-              } catch {
-                // falls semver nicht installiert ist, nimm fallback
-              }
-
-              if (!version) {
-                set('should_run', 'false');
-                return;
-              }
-
-              set('version', version);
-              set('should_run', 'true');
-            } catch {
-              set('should_run', 'false');
-            }
-          })();
-          NODE
-
-      - name: Debug outputs
-        run: |
-          echo "version=${{ steps.changeset.outputs.version }}"
-          echo "should_run=${{ steps.changeset.outputs.should_run }}"
-
-  create-pr:
-    name: Create/Update Version PR
-    needs: get-version
-    if: ${{ fromJSON(needs.get-version.outputs.should_run) }}
+  version:
+    name: Create Version PR
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -109,17 +28,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Erstellt ODER aktualisiert den bestehenden Changesets Release-PR.
-      # Der PR-Titel enthält die nächste Version.
-      - name: Create or update Changeset PR
+      - name: Create Changeset PR or update existing one
+        id: changesets
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          title: "Upcoming Release v${{ needs.get-version.outputs.version }}"
+          title: "Release: Version Updates"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update PR title with version
+        if: steps.changesets.outputs.pullRequestNumber != ''
+        run: |
+          # Lese die neue Version aus der package.json
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          PR_NUMBER=${{ steps.changesets.outputs.pullRequestNumber }}
+
+          # Aktualisiere den PR-Titel
+          gh pr edit $PR_NUMBER \
+            --title "Release v${NEW_VERSION}" \
+            --body "This PR was automatically generated and contains version updates for the next release.
+
+          ## Changes
+
+          The following packages will be updated:
+
+          $(cat .changeset/*.md 2>/dev/null || echo 'No changesets found')"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
