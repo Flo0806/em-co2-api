@@ -1,26 +1,24 @@
 # .github/workflows/release.yml
-
-name: Create GitHub Release
+name: Release API
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   release:
-    name: Create Release
+    name: Build, Push & Release
     runs-on: ubuntu-latest
-    # Die 'if'-Bedingung stellt sicher, dass der Job nur nach dem Mergen des Versions-PRs läuft
     if: contains(github.event.head_commit.message, 'Upcoming Release')
+
     permissions:
-      contents: write # Nötig, um Git-Tags zu pushen und Releases zu erstellen
+      contents: write # Zum Erstellen von Git-Tags und GitHub Releases
+      packages: write # Zum Pushen des Docker-Images zur GitHub Container Registry
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Wir brauchen den kompletten Verlauf für die Tags
           fetch-depth: 0
 
       - name: Setup pnpm
@@ -28,7 +26,7 @@ jobs:
         with:
           version: 10.11.0
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -37,9 +35,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create Git Tags and GitHub Releases
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # Erstellt Docker-Tags wie: 1.1.0, 1.1, 1, latest
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=edge,branch=main
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Create Git Tag and GitHub Release
         uses: changesets/action@v1
         with:
+          # Erstellt nur den Git-Tag und das Release, kein npm publish
           publish: pnpm changeset tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
