@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.2.1
+
+### Patch Changes
+
+- c935df1: added npm publish
+
 ## 1.2.0
 
 ### Minor Changes
