@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.2.0
+
+### Minor Changes
+
+- 6722366: added new workflow
+
 ## 1.1.1
 
 ### Patch Changes
