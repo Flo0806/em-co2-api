@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.4.2
+
+### Patch Changes
+
+- ef9faad: go
+
 ## 1.4.1
 
 ### Patch Changes
