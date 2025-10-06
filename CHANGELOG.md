@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.2.3
+
+### Patch Changes
+
+- a8f9f55: added new token
+
 ## 1.2.2
 
 ### Patch Changes

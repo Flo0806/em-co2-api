@@ -1,6 +1,6 @@
 {
   "name": "em-co2-api",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "API für CO₂-Intensität des deutschen Strommix (Emissionsfaktor) und CO₂-Rechner für Wärmepumpen und Gasheizungen.",
   "type": "module",
   "author": "Florian Heuberger",
