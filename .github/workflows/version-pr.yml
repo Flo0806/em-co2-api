@@ -9,23 +9,18 @@ on:
       - ".changeset/**"
 
 jobs:
-  # JOB 1: Determine future version
   get-version:
     name: Get next version
     runs-on: ubuntu-latest
     outputs:
-      # We define an output to pass the version to the next job
       version: ${{ steps.changeset.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
+      # Dieser Schritt funktioniert jetzt, weil 'packageManager' in der package.json steht
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -39,24 +34,11 @@ jobs:
       - name: Get next version number
         id: changeset
         run: |
-          # Execute 'changeset version' but without changing files (--snapshot)
-          # and get the first line of output that contains the new version.
-          # Example output: "🦋  info Released em-co2-api@1.3.0"
-          VERSION_LINE=$(pnpm changeset version --snapshot)
-
-          # Extract the version number with regex
-          VERSION=$(echo "$VERSION_LINE" | sed -n 's/.*Released .*@\([0-9.]*\).*/\1/p')
-
-          # Output the version for the next job
+          VERSION=$(pnpm changeset status --json | jq -r '.releases[0].newVersion')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          # Reset the git status since --snapshot creates a file
-          git checkout .
-
-  # JOB 2: Create the Pull Request with dynamic title
   create-pr:
     name: Create Version PR
-    # This job only starts when 'get-version' was successful
     needs: get-version
     runs-on: ubuntu-latest
     permissions:
@@ -68,10 +50,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Auch hier ohne 'with:'
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.11.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -86,7 +67,6 @@ jobs:
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          # Here we use the output from the first job for the title!
           title: "Upcoming Release v${{ needs.get-version.outputs.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
