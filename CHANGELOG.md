@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.2.2
+
+### Patch Changes
+
+- d4bf343: fixed access
+
 ## 1.2.1
 
 ### Patch Changes
