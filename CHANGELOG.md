@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.1.1
+
+### Patch Changes
+
+- 07dd5ca: updated version-pr workflow
+
 ## 1.1.0
 
 ### Minor Changes
