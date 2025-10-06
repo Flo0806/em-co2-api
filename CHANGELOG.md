@@ -1,5 +1,11 @@
 # em-co2-api
 
+## 1.1.0
+
+### Minor Changes
+
+- bfbd969: added release workflow
+
 ## 1.0.1
 
 ### Patch Changes
