@@ -8,9 +8,90 @@ on:
     paths:
       - ".changeset/**"
 
+# Verhindert parallele Version-PRs auf derselben Branch
+concurrency:
+  group: version-pr-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  version:
-    name: Create Version PR
+  get-version:
+    name: Get next version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.changeset.outputs.version }}
+      should_run: ${{ steps.changeset.outputs.should_run }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Get next version number (via Changesets API)
+        id: changeset
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const out = process.env.GITHUB_OUTPUT;
+          const set = (k, v) => fs.appendFileSync(out, `${k}=${v}\n`);
+
+          (async () => {
+            try {
+              const getReleasePlan = require("@changesets/get-release-plan").default;
+              const plan = await getReleasePlan(process.cwd());
+              const releases = Array.isArray(plan?.releases) ? plan.releases : [];
+
+              if (releases.length === 0) {
+                set('should_run', 'false');
+                return;
+              }
+
+              // Version für PR-Titel bestimmen:
+              // - Single-Package: releases[0].newVersion
+              // - Monorepo: höchste Zielversion (semver-max)
+              let version = releases[0]?.newVersion;
+              try {
+                const semver = require('semver');
+                version = releases
+                  .map(r => r.newVersion)
+                  .filter(Boolean)
+                  .sort((a, b) => (semver.gt(a, b) ? -1 : 1))[0] || version;
+              } catch {
+                // falls semver nicht installiert ist, nimm fallback
+              }
+
+              if (!version) {
+                set('should_run', 'false');
+                return;
+              }
+
+              set('version', version);
+              set('should_run', 'true');
+            } catch {
+              set('should_run', 'false');
+            }
+          })();
+          NODE
+
+      - name: Debug outputs
+        run: |
+          echo "version=${{ steps.changeset.outputs.version }}"
+          echo "should_run=${{ steps.changeset.outputs.should_run }}"
+
+  create-pr:
+    name: Create/Update Version PR
+    needs: get-version
+    if: ${{ fromJSON(needs.get-version.outputs.should_run) }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,23 +104,22 @@ jobs:
 
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
-        # Liest die Version aus der package.json, falls 'packageManager' vorhanden ist
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Create Changeset PR or update existing one
+      # Erstellt ODER aktualisiert den bestehenden Changesets Release-PR.
+      # Der PR-Titel enthält die nächste Version.
+      - name: Create or update Changeset PR
         uses: changesets/action@v1
         with:
-          # Führt 'changeset version' aus, um die Dateien zu aktualisieren
           version: pnpm changeset version
-          # Ein einfacher, statischer Titel ist am robustesten
-          title: "Upcoming Release"
+          title: "Upcoming Release v${{ needs.get-version.outputs.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
