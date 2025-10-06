@@ -12,8 +12,8 @@ jobs:
     if: contains(github.event.head_commit.message, 'Upcoming Release')
 
     permissions:
-      contents: write # Für GitHub Releases & Tags
-      packages: write # Für Docker-Images in der GHCR
+      contents: write # For GitHub Releases & Tags
+      packages: write # For Docker images in GHCR
 
     steps:
       - name: Checkout
@@ -26,7 +26,7 @@ jobs:
         with:
           version: 10.11.0
 
-      # Setup Node für den Build-Prozess
+      # Setup Node for the build process
       - name: Setup Node.js for build
         uses: actions/setup-node@v4
         with:
@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # --- Docker-Teil ---
+      # --- Docker section ---
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -63,8 +63,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # --- NPM & GitHub Release Teil ---
-      # Setup Node erneut, diesmal mit der Registry-URL für den Publish-Befehl
+      # --- NPM & GitHub Release section ---
+      # Setup Node again, this time with the registry URL for the publish command
       - name: Setup Node.js for publish
         uses: actions/setup-node@v4
         with:
@@ -74,10 +74,10 @@ jobs:
       - name: Publish to npm and create GitHub Release
         uses: changesets/action@v1
         with:
-          # Dieser Befehl macht ALLES: npm publish, git tag, github release
+          # This command does EVERYTHING: npm publish, git tag, github release
           publish: pnpm changeset publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Stelle sicher, dass dieses Secret in den Repo-Einstellungen existiert
+          # Make sure this secret exists in the repository settings
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
