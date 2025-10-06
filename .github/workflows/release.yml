@@ -7,13 +7,13 @@ on:
 
 jobs:
   release:
-    name: Build, Push & Release
+    name: Build, Push & Publish
     runs-on: ubuntu-latest
     if: contains(github.event.head_commit.message, 'Upcoming Release')
 
     permissions:
-      contents: write # Zum Erstellen von Git-Tags und GitHub Releases
-      packages: write # Zum Pushen des Docker-Images zur GitHub Container Registry
+      contents: write # Für GitHub Releases & Tags
+      packages: write # Für Docker-Images in der GHCR
 
     steps:
       - name: Checkout
@@ -26,7 +26,8 @@ jobs:
         with:
           version: 10.11.0
 
-      - name: Setup Node
+      # Setup Node für den Build-Prozess
+      - name: Setup Node.js for build
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -35,6 +36,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # --- Docker-Teil ---
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -47,7 +49,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
-          # Erstellt Docker-Tags wie: 1.1.0, 1.1, 1, latest
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -62,10 +63,20 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Create Git Tag and GitHub Release
+      # --- NPM & GitHub Release Teil ---
+      # Setup Node erneut, diesmal mit der Registry-URL für den Publish-Befehl
+      - name: Setup Node.js for publish
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish to npm and create GitHub Release
         uses: changesets/action@v1
         with:
-          # Erstellt nur den Git-Tag und das Release, kein npm publish
-          publish: pnpm changeset tag
+          # Dieser Befehl macht ALLES: npm publish, git tag, github release
+          publish: pnpm changeset publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Stelle sicher, dass dieses Secret in den Repo-Einstellungen existiert
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
