@@ -8,100 +8,9 @@ on:
     paths:
       - ".changeset/**"
 
-concurrency:
-  group: version-pr-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  get-version:
-    name: Get next version
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.changeset.outputs.version }}
-      should_run: ${{ steps.changeset.outputs.should_run }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Get next version number (via Changesets API)
-        id: changeset
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('fs');
-
-          // Safe write to GitHub outputs
-          const out = process.env.GITHUB_OUTPUT;
-          const setOutput = (k, v) => fs.appendFileSync(out, `${k}=${v}\n`);
-
-          async function main() {
-            let getReleasePlan;
-            try {
-              // Changesets’ official API
-              getReleasePlan = require("@changesets/get-release-plan").default;
-            } catch (e) {
-              // Falls Changesets (unerwartet) nicht installiert ist
-              setOutput('should_run', 'false');
-              return;
-            }
-
-            let plan;
-            try {
-              plan = await getReleasePlan(process.cwd());
-            } catch (e) {
-              setOutput('should_run', 'false');
-              return;
-            }
-
-            const releases = Array.isArray(plan?.releases) ? plan.releases : [];
-            if (releases.length === 0) {
-              setOutput('should_run', 'false');
-              return;
-            }
-
-            // Version bestimmen:
-            // - Single-Package: releases[0].newVersion
-            // - Monorepo/independent: nimm die HÖCHSTE Semver (für PR-Titel)
-            let version = releases[0]?.newVersion;
-            try {
-              const semver = require('semver');
-              version = releases
-                .map(r => r.newVersion)
-                .filter(Boolean)
-                .sort((a, b) => (semver.gt(a, b) ? -1 : 1))  // absteigend
-                [0] || version;
-            } catch {
-              // semver nicht vorhanden -> first fallback
-            }
-
-            if (!version) {
-              setOutput('should_run', 'false');
-              return;
-            }
-
-            setOutput('version', version);
-            setOutput('should_run', 'true');
-          }
-
-          main();
-          NODE
-
-  create-pr:
-    name: Create/Update Version PR
-    needs: get-version
-    if: needs.get-version.outputs.should_run == 'true'
+  version:
+    name: Create Version PR
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -114,23 +23,23 @@ jobs:
 
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
+        # Liest die Version aus der package.json, falls 'packageManager' vorhanden ist
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Wichtig:
-      # - "version" triggert das Erstellen/Updaten des Release-PRs.
-      # - Der PR wird automatisch wiederverwendet/aktualisiert, wenn weitere Changesets dazukommen.
-      - name: Create or update Changeset PR
+      - name: Create Changeset PR or update existing one
         uses: changesets/action@v1
         with:
+          # Führt 'changeset version' aus, um die Dateien zu aktualisieren
           version: pnpm changeset version
-          title: "Upcoming Release v${{ needs.get-version.outputs.version }}"
+          # Ein einfacher, statischer Titel ist am robustesten
+          title: "Upcoming Release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
