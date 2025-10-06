@@ -1,0 +1,95 @@
+{
+  "info": {
+    "name": "EM CO₂ Mini API",
+    "_postman_id": "0b9c4f8e-2a5e-4f7a-9d2a-bc1f1b5a0001",
+    "description": "Kleine TS/Node API für CO₂-Berechnungen (Electricity Maps + Altanlage Vergleich).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "CO₂: Latest (kgCO2/kWh)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/co2/latest",
+          "host": ["{{baseUrl}}"],
+          "path": ["co2", "latest"]
+        },
+        "description": "Aktuelle CO₂-Intensität (kgCO2/kWh) + Rohdaten von Electricity Maps (über Server-ENV konfigurierter Standort)."
+      },
+      "response": []
+    },
+    {
+      "name": "CO₂: History (letzte 24h)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/co2/history?hours=24",
+          "host": ["{{baseUrl}}"],
+          "path": ["co2", "history"],
+          "query": [{ "key": "hours", "value": "24", "description": "1–168" }]
+        },
+        "description": "Verlauf der CO₂-Intensität; Standard 24h. Werte in gCO2/kWh und kgCO2/kWh."
+      },
+      "response": []
+    },
+    {
+      "name": "Calc: Wärmepumpe (kWh → CO₂)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"kWh\": 250\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/calc/wp",
+          "host": ["{{baseUrl}}"],
+          "path": ["calc", "wp"]
+        },
+        "description": "Berechnet CO₂ für WP: kWh * aktueller EM-Faktor (kgCO2/kWh)."
+      },
+      "response": []
+    },
+    {
+      "name": "Calc: Altanlage (Gas) – CO₂",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"heat_kWh\": 1000,\n  \"efficiency\": 0.85,\n  \"gasFactor_kg_per_kWh\": 0.201\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/calc/alt",
+          "host": ["{{baseUrl}}"],
+          "path": ["calc", "alt"]
+        },
+        "description": "CO₂ für Altanlage (Gas). Standard: η=0.85, Faktor=0.201 kg/kWh (anpassbar)."
+      },
+      "response": []
+    },
+    {
+      "name": "Calc: Einsparung (WP vs. Gas)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"heat_kWh\": 1000,\n  \"cop\": 4,\n  \"gasFactor_kg_per_kWh\": 0.201\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/calc/savings",
+          "host": ["{{baseUrl}}"],
+          "path": ["calc", "savings"]
+        },
+        "description": "Vergleicht WP (mit aktuellem Stromfaktor) gegen Gas (η=0.85 default). Liefert savings_kg."
+      },
+      "response": []
+    }
+  ],
+  "event": [],
+  "variable": [{ "key": "baseUrl", "value": "http://localhost:3000" }]
+}

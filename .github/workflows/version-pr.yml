@@ -1,0 +1,40 @@
+# .github/workflows/version-pr.yml
+
+name: Version PR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  version:
+    name: Create Version PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        # Die 'version'-Zeile wurde entfernt.
+        # Die Action nutzt jetzt die Version aus der 'package.json'.
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Changeset PR or update existing one
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          title: "Upcoming Release"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
